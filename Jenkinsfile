@@ -122,7 +122,7 @@ pipeline {
             echo 'Pipeline Execution Completed'
             echo '==========================================='
 
-            cleanWs()
+           // cleanWs()
 
         }
     }
