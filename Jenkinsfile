@@ -7,6 +7,8 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'SonarScanner'
+        IMAGE_NAME = "awinash8/devops-demo-app"
+        IMAGE_TAG = "latest"
     }
 
     stages {
@@ -19,14 +21,12 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Checking out source code...'
                 checkout scm
             }
         }
 
         stage('Build Application') {
             steps {
-                echo 'Compiling application...'
                 sh 'chmod +x mvnw'
                 sh './mvnw clean compile'
             }
@@ -34,7 +34,6 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
-                echo 'Running unit tests...'
                 sh './mvnw test'
             }
         }
@@ -42,10 +41,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh """
-                        ./mvnw sonar:sonar \
-                        -Dsonar.projectKey=devops-demo-app
-                    """
+                    sh './mvnw sonar:sonar -Dsonar.projectKey=devops-demo-app'
                 }
             }
         }
@@ -60,7 +56,6 @@ pipeline {
 
         stage('Package Application') {
             steps {
-                echo 'Packaging application...'
                 sh './mvnw clean package'
             }
         }
@@ -70,10 +65,36 @@ pipeline {
                 archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
             }
         }
+
+        stage('Build Docker Image') {
+            steps {
+                sh '''
+                    docker build \
+                    -t $IMAGE_NAME:$IMAGE_TAG \
+                    -f docker/Dockerfile .
+                '''
+            }
+        }
+
+        stage('Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-jenkins',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push $IMAGE_NAME:$IMAGE_TAG
+                        docker logout
+                    '''
+                }
+            }
+        }
     }
 
     post {
-
         always {
             cleanWs()
         }
