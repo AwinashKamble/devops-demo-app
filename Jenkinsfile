@@ -21,12 +21,14 @@ pipeline {
 
         stage('Checkout') {
             steps {
+                echo 'Checking out source code...'
                 checkout scm
             }
         }
 
         stage('Build Application') {
             steps {
+                echo 'Compiling application...'
                 sh 'chmod +x mvnw'
                 sh './mvnw clean compile'
             }
@@ -34,6 +36,7 @@ pipeline {
 
         stage('Run Unit Tests') {
             steps {
+                echo 'Running unit tests...'
                 sh './mvnw test'
             }
         }
@@ -56,6 +59,7 @@ pipeline {
 
         stage('Package Application') {
             steps {
+                echo 'Packaging application...'
                 sh './mvnw clean package'
             }
         }
@@ -68,9 +72,10 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
+                echo 'Building Docker image...'
                 sh '''
                     docker build \
-                    -t $IMAGE_NAME:$IMAGE_TAG \
+                    -t ${IMAGE_NAME}:${IMAGE_TAG} \
                     -f docker/Dockerfile .
                 '''
             }
@@ -78,15 +83,17 @@ pipeline {
 
         stage('Push Docker Image') {
             steps {
+                echo 'Pushing Docker image to Docker Hub...'
+
                 withCredentials([usernamePassword(
-                    credentialsId: 'dockerhub-jenkins',
+                    credentialsId: 'dockerhub',
                     usernameVariable: 'DOCKER_USER',
                     passwordVariable: 'DOCKER_PASS'
                 )]) {
 
                     sh '''
                         echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push $IMAGE_NAME:$IMAGE_TAG
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
                         docker logout
                     '''
                 }
@@ -95,16 +102,15 @@ pipeline {
     }
 
     post {
-        always {
+
+        success {
+            echo '✅ CI/CD Pipeline executed successfully!'
             cleanWs()
         }
 
-        success {
-            echo 'Pipeline executed successfully.'
-        }
-
         failure {
-            echo 'Pipeline failed.'
+            echo '❌ Pipeline failed!'
+            cleanWs()
         }
     }
 }
